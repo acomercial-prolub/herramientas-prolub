@@ -115,12 +115,31 @@
     $('guia').innerHTML = '<b class="t">Así la instalas</b><ol>' + GUIAS[p].map(function(x){ return '<li>' + x + '</li>'; }).join('') + '</ol>';
     $('guia').classList.remove('hidden');
   }
-  window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); aviso = e; });
+  var esperando = [];
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault(); aviso = e;
+    $('btnInstalar').textContent = 'Instalar app';
+    esperando.splice(0).forEach(function(f){ f(); });
+  });
+  function lanzarInstalacion(){
+    aviso.prompt();
+    aviso.userChoice.then(function(r){
+      if (r.outcome !== 'accepted') $('estado').textContent = 'Instalación cancelada. Puedes intentarlo de nuevo cuando quieras.';
+      aviso = null;
+    });
+  }
+  // Un solo toque: abre el cuadro nativo de instalación del navegador (Chrome, Edge, Android).
   $('btnInstalar').onclick = function(){
-    if (aviso){
-      aviso.prompt();
-      aviso.userChoice.then(function(r){ if (r.outcome !== 'accepted') guia(); aviso = null; });
-    } else guia();
+    if (aviso) return lanzarInstalacion();
+    if (plataforma() === 'ios') return guia();          // iPhone no permite instalar por botón
+    $('estado').textContent = 'Preparando la instalación…';
+    var listo = false;
+    esperando.push(function(){ listo = true; $('estado').textContent = ''; lanzarInstalacion(); });
+    setTimeout(function(){
+      if (listo) return;
+      $('estado').textContent = 'Si ya la instalaste, ábrela desde tu inicio o escritorio. Si no, sigue estos pasos:';
+      guia();
+    }, 2500);
   };
   window.addEventListener('appinstalled', function(){
     $('guia').classList.add('hidden');
@@ -132,7 +151,7 @@
     window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
   }
   if (enApp()) abrir();
-  else if (plataforma() === 'ios') $('btnInstalar').textContent = 'Cómo instalarla';
+  else if (plataforma() === 'ios'){ $('btnInstalar').textContent = 'Cómo instalarla'; if (/[?&]instalar=1\b/.test(location.search)) guia(); }
 </script>
 </body>
 </html>
