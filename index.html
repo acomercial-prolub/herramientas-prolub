@@ -9,6 +9,9 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icons/favicon-64.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="icons/apple-touch-icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/apple-touch-icon-152.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Herramientas">
@@ -94,18 +97,44 @@
     $('acciones').classList.add('hidden'); $('guia').classList.add('hidden');
     $('sub').textContent = 'Abriendo tus herramientas…';
     $('bar').classList.remove('hidden');
-    if (CFG.modo === 'incrustar'){
-      var f = document.createElement('iframe'); f.className = 'app'; f.src = u; f.title = 'Herramientas Prolub';
-      f.allow = 'clipboard-write'; document.body.appendChild(f);
-    } else {
-      location.replace(u);
-    }
+    var modo = CFG.modo || 'auto';
+    // Pantalla completa = el Centro se muestra DENTRO de la app. Solo se usa cuando la app está instalada;
+    // en iPhone Safari bloquea la sesión de Google dentro de la app, así que allí se abre directo.
+    if (modo === 'redirigir' || !enApp() || (modo === 'auto' && plataforma() === 'ios')) { location.replace(u); return; }
+    incrustar(u);
+  }
+
+  /* ---------- pantalla completa (el Centro dentro de la app) con respaldo automático ---------- */
+  var cargado = false, marco = null;
+  function incrustar(u){
+    marco = document.createElement('iframe');
+    marco.className = 'app hidden'; marco.src = u; marco.title = 'Herramientas Prolub';
+    marco.allow = 'clipboard-write';
+    document.body.appendChild(marco);
+    setTimeout(function(){ if (!cargado) respaldo(u); }, 12000);   // sin respuesta: casi siempre falta la sesión de Google
+  }
+  // El Centro avisa con postMessage cuando cargó (ver Index.html de Apps Script)
+  window.addEventListener('message', function(e){
+    var d = e.data || {};
+    if (d.app !== 'herramientas-prolub' || !marco) return;
+    if (!/^https:\/\/([a-z0-9-]+\.)*(googleusercontent|google)\.com$/.test(e.origin)) return;
+    cargado = true;
+    marco.classList.remove('hidden');
+  });
+  function respaldo(u){
+    if (marco){ marco.remove(); marco = null; }
+    document.body.classList.remove('lanzando');
+    $('bar').classList.add('hidden');
+    $('sub').textContent = 'No pudimos abrir tus herramientas dentro de la app. Suele pasar cuando tu sesión de Google no está iniciada en este navegador.';
+    $('acciones').innerHTML = '<a class="btn primario" href="' + u + '">Continuar</a>' +
+                              '<button type="button" class="btn sec" onclick="location.reload()">Reintentar</button>';
+    $('acciones').classList.remove('hidden');
   }
   $('btnAbrir').onclick = function(e){ e.preventDefault(); abrir(); };
 
   /* ---------- instalar ---------- */
   var GUIAS = {
-    ios: ['Abre esta página en <b>Safari</b>.', 'Toca <b>Compartir</b> (el cuadro con la flecha hacia arriba).', 'Elige <b>Agregar a inicio</b> y toca <b>Agregar</b>.'],
+    ios: ['Hazlo <b>en esta página</b> (la morada), abierta en <b>Safari</b>.', 'Toca <b>Compartir</b> (el cuadro con la flecha hacia arriba).', 'Elige <b>Agregar a inicio</b>, deja <b>Abrir como app web</b> activado y toca <b>Agregar</b>.', 'Si ya tenías un acceso sin logo, bórralo antes.'],
     android: ['Toca el menú <b>⋮</b> de Chrome.', 'Elige <b>Instalar app</b> (o <b>Agregar a la pantalla principal</b> → <b>Instalar</b>).'],
     pc: ['En la barra de direcciones, toca el ícono <b>Instalar</b> (pantalla con flecha), o abre el menú <b>⋮</b>.', 'Elige <b>Instalar Herramientas Prolub</b> y confirma.'],
     edge: ['Abre el menú <b>…</b> de Edge.', 'Elige <b>Aplicaciones</b> → <b>Instalar Herramientas Prolub</b> y confirma.']
